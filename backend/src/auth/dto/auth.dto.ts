@@ -70,3 +70,14 @@ export class ResetPasswordDto {
   @IsStrongPassword()
   newPassword: string;
 }
+
+export class ChangePasswordDto {
+  @IsString()
+  @IsNotEmpty()
+  currentPassword: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @IsStrongPassword()
+  newPassword: string;
+}

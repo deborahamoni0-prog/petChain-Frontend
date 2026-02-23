@@ -16,4 +16,14 @@ export const authConfig = registerAs('auth', () => ({
   emailVerificationExpiration:
     process.env.EMAIL_VERIFICATION_EXPIRATION || '24h',
   maxFailedLoginAttempts: 5,
+  // Password policy settings
+  passwordExpiryDays: process.env.PASSWORD_EXPIRY_DAYS
+    ? parseInt(process.env.PASSWORD_EXPIRY_DAYS, 10)
+    : 90, // Default 90 days, set to 0 to disable
+  passwordHistoryLimit: parseInt(process.env.PASSWORD_HISTORY_LIMIT || '5', 10), // Prevent reuse of last 5 passwords
+  minPasswordLength: 8,
+  requireUppercase: true,
+  requireLowercase: true,
+  requireNumbers: true,
+  requireSymbols: true,
 }));

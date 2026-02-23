@@ -35,6 +35,7 @@ export interface AuthContextType extends AuthState {
   resetPassword: (token: string, newPassword: string) => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
   verifyEmail: (token: string) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -328,6 +329,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const changePassword = async (currentPassword: string, newPassword: string): Promise<void> => {
+    setLoading(true);
+    clearError();
+
+    try {
+      await makeRequest('/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Password change failed');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const value: AuthContextType = {
     ...state,
     login,
@@ -338,6 +356,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     resetPassword,
     forgotPassword,
     verifyEmail,
+    changePassword,
   };
 
   return (

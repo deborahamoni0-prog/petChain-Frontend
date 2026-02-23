@@ -23,12 +23,14 @@ import { UserSessionService } from './services/user-session.service';
 import { UserActivityLogService } from './services/user-activity-log.service';
 import { UserSearchService } from './services/user-search.service';
 import { FileUploadService } from './services/file-upload.service';
+import { OnboardingService } from './services/onboarding.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { SearchUsersDto } from './dto/search-users.dto';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import { UpdateUserPreferencesDto } from './dto/update-user-preferences.dto';
 import { User } from './entities/user.entity';
+import type { OnboardingStepId } from './entities/user-onboarding.entity';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -43,6 +45,7 @@ export class UsersController {
     private readonly sessionService: UserSessionService,
     private readonly activityLogService: UserActivityLogService,
     private readonly searchService: UserSearchService,
+    private readonly onboardingService: OnboardingService,
     private readonly fileUploadService?: FileUploadService, // optional injection for direct avatar upload
   ) {}
 

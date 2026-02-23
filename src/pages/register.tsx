@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { useAuth } from '../contexts/AuthContext';
+import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
+import { isPasswordStrong } from '../utils/passwordStrength';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -31,8 +33,8 @@ export default function RegisterPage() {
       return false;
     }
     
-    if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters long');
+    if (!isPasswordStrong(formData.password)) {
+      setError('Password must meet all requirements: at least 8 characters, uppercase, lowercase, numbers, and special characters');
       return false;
     }
 
@@ -171,9 +173,7 @@ export default function RegisterPage() {
                 value={formData.password}
                 onChange={handleInputChange}
               />
-              <p className="mt-1 text-xs text-gray-500">
-                Must be at least 8 characters with uppercase, lowercase, numbers, and special characters.
-              </p>
+              <PasswordStrengthMeter password={formData.password} />
             </div>
             
             <div>

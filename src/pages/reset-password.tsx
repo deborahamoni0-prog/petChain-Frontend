@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { useAuth } from '../contexts/AuthContext';
+import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
+import { isPasswordStrong } from '../utils/passwordStrength';
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('');
@@ -26,8 +28,8 @@ export default function ResetPasswordPage() {
       return false;
     }
     
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters long');
+    if (!isPasswordStrong(password)) {
+      setError('Password must meet all requirements: at least 8 characters, uppercase, lowercase, numbers, and special characters');
       return false;
     }
 
@@ -135,9 +137,7 @@ export default function ResetPasswordPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
-              <p className="mt-1 text-xs text-gray-500">
-                Must be at least 8 characters with uppercase, lowercase, numbers, and special characters.
-              </p>
+              <PasswordStrengthMeter password={password} />
             </div>
             
             <div>

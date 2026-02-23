@@ -83,14 +83,16 @@ export class ReportService {
         // Clean sensitive user info
         data.forEach(report => {
             if (report.reporter) {
-                delete report.reporter.password;
-                delete report.reporter.passwordResetToken;
-                delete report.reporter.emailVerificationToken;
+                const reporter = report.reporter as any;
+                delete reporter.password;
+                delete reporter.passwordResetToken;
+                delete reporter.emailVerificationToken;
             }
             if (report.reportedUser) {
-                delete report.reportedUser.password;
-                delete report.reportedUser.passwordResetToken;
-                delete report.reportedUser.emailVerificationToken;
+                const reportedUser = report.reportedUser as any;
+                delete reportedUser.password;
+                delete reportedUser.passwordResetToken;
+                delete reportedUser.emailVerificationToken;
             }
         });
 
@@ -114,14 +116,16 @@ export class ReportService {
 
         // clean up password
         if (report.reporter) {
-            delete report.reporter.password;
-            delete report.reporter.passwordResetToken;
-            delete report.reporter.emailVerificationToken;
+            const reporter = report.reporter as any;
+            delete reporter.password;
+            delete reporter.passwordResetToken;
+            delete reporter.emailVerificationToken;
         }
         if (report.reportedUser) {
-            delete report.reportedUser.password;
-            delete report.reportedUser.passwordResetToken;
-            delete report.reportedUser.emailVerificationToken;
+            const reportedUser = report.reportedUser as any;
+            delete reportedUser.password;
+            delete reportedUser.passwordResetToken;
+            delete reportedUser.emailVerificationToken;
         }
 
         return report;

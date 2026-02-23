@@ -74,6 +74,13 @@ export class User {
   @Column({ type: 'timestamp', nullable: true })
   lastLogin: Date;
 
+  // Password expiry fields
+  @Column({ type: 'timestamp', nullable: true })
+  passwordExpiresAt: Date | null;
+
+  @Column({ default: false })
+  passwordChangeRequired: boolean;
+
   @Column({ type: 'timestamp', nullable: true })
   deletedAt: Date;
 

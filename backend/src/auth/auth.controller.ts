@@ -17,6 +17,7 @@ import {
   VerifyEmailDto,
   ForgotPasswordDto,
   ResetPasswordDto,
+  ChangePasswordDto,
 } from './dto/auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
@@ -76,5 +77,20 @@ export class AuthController {
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     await this.authService.resetPassword(resetPasswordDto);
     return { message: 'Password reset successfully' };
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @Body() changePasswordDto: ChangePasswordDto,
+    @CurrentUser() user: User,
+  ) {
+    await this.authService.changePassword(
+      user.id,
+      changePasswordDto.currentPassword,
+      changePasswordDto.newPassword,
+    );
+    return { message: 'Password changed successfully' };
   }
 }

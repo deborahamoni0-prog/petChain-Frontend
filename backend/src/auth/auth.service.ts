@@ -13,6 +13,7 @@ import { UsersService } from '../modules/users/users.service';
 import { User } from '../modules/users/entities/user.entity';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { Session } from './entities/session.entity';
+import { PasswordHistory } from './entities/password-history.entity';
 import {
   RegisterDto,
   LoginDto,
@@ -61,6 +62,8 @@ export class AuthService {
     private readonly refreshTokenRepository: Repository<RefreshToken>,
     @InjectRepository(Session)
     private readonly sessionRepository: Repository<Session>,
+    @InjectRepository(PasswordHistory)
+    private readonly passwordHistoryRepository: Repository<PasswordHistory>,
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
@@ -117,9 +120,14 @@ export class AuthService {
       emailVerificationExpires: verificationExpires,
       isActive: true,
       failedLoginAttempts: 0,
+      passwordExpiresAt: this.calculatePasswordExpiryDate(),
+      passwordChangeRequired: false,
     });
 
     const savedUser = await this.userRepository.save(user);
+
+    // Save initial password to history
+    await this.savePasswordToHistory(savedUser.id, hashedPassword);
 
     // Send verification email
     try {
@@ -203,6 +211,13 @@ export class AuthService {
       user.failedLoginAttempts = 0;
       (user as { lockedUntil: Date | null }).lockedUntil = null;
       await this.userRepository.save(user);
+    }
+
+    // Check password expiry
+    if (this.isPasswordExpired(user)) {
+      user.passwordChangeRequired = true;
+      await this.userRepository.save(user);
+      // Allow login but flag that password change is required
     }
 
     // Check email verification (optional - can be made required)
@@ -423,6 +438,13 @@ export class AuthService {
       throw new BadRequestException('Reset token has expired');
     }
 
+    // Check if new password is in history (prevent reuse)
+    if (await this.isPasswordInHistory(user.id, resetPasswordDto.newPassword)) {
+      throw new ConflictException(
+        'Password cannot be one of your last 5 passwords',
+      );
+    }
+
     // Hash new password
     const bcryptRounds =
       this.configService.get<number>('auth.bcryptRounds') || 12;
@@ -431,12 +453,19 @@ export class AuthService {
       bcryptRounds,
     );
 
+    // Save current password to history before updating
+    if (user.password) {
+      await this.savePasswordToHistory(user.id, user.password);
+    }
+
     // Update user
     user.password = hashedPassword;
     user.passwordResetToken = null as any;
     user.passwordResetExpires = null as any;
     user.failedLoginAttempts = 0; // Reset failed attempts
     (user as { lockedUntil: Date | null }).lockedUntil = null; // Unlock account
+    user.passwordExpiresAt = this.calculatePasswordExpiryDate(); // Reset password expiry
+    user.passwordChangeRequired = false;
     await this.userRepository.save(user);
 
     // Invalidate all refresh tokens for security
@@ -563,5 +592,144 @@ export class AuthService {
       });
       await this.sessionRepository.save(newSession);
     }
+  }
+
+  /**
+   * Check if password exists in user's password history
+   */
+  private async isPasswordInHistory(
+    userId: string,
+    password: string,
+  ): Promise<boolean> {
+    const historyLimit =
+      this.configService.get<number>('auth.passwordHistoryLimit') || 5;
+
+    // Get recent password history
+    const passwordHistory = await this.passwordHistoryRepository.find({
+      where: { userId },
+      order: { createdAt: 'DESC' },
+      take: historyLimit,
+    });
+
+    // Check against each historical password
+    for (const historyEntry of passwordHistory) {
+      const isMatch = await PasswordUtil.comparePassword(
+        password,
+        historyEntry.passwordHash,
+      );
+      if (isMatch) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Save password to history
+   */
+  private async savePasswordToHistory(
+    userId: string,
+    passwordHash: string,
+  ): Promise<void> {
+    const historyLimit =
+      this.configService.get<number>('auth.passwordHistoryLimit') || 5;
+
+    // Create new history entry
+    const historyEntry = this.passwordHistoryRepository.create({
+      userId,
+      passwordHash,
+    });
+    await this.passwordHistoryRepository.save(historyEntry);
+
+    // Clean up old entries beyond the limit
+    const allHistory = await this.passwordHistoryRepository.find({
+      where: { userId },
+      order: { createdAt: 'DESC' },
+    });
+
+    if (allHistory.length > historyLimit) {
+      const toDelete = allHistory.slice(historyLimit);
+      await this.passwordHistoryRepository.remove(toDelete);
+    }
+  }
+
+  /**
+   * Check if password has expired
+   */
+  private isPasswordExpired(user: User): boolean {
+    const passwordExpiryDays =
+      this.configService.get<number>('auth.passwordExpiryDays') || 0;
+
+    // If passwordExpiryDays is 0 or not set, password expiry is disabled
+    if (passwordExpiryDays <= 0) {
+      return false;
+    }
+
+    // Check if password has never expired (first login)
+    if (!user.passwordExpiresAt) {
+      return false;
+    }
+
+    return user.passwordExpiresAt < new Date();
+  }
+
+  /**
+   * Calculate password expiry date
+   */
+  private calculatePasswordExpiryDate(): Date {
+    const passwordExpiryDays =
+      this.configService.get<number>('auth.passwordExpiryDays') || 90;
+    const expiryDate = new Date();
+    expiryDate.setDate(expiryDate.getDate() + passwordExpiryDays);
+    return expiryDate;
+  }
+
+  /**
+   * Change password with history check
+   */
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    // Verify current password
+    if (
+      !user.password ||
+      !(await PasswordUtil.comparePassword(currentPassword, user.password))
+    ) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    // Check if new password is in history
+    if (await this.isPasswordInHistory(userId, newPassword)) {
+      throw new ConflictException(
+        'Password cannot be one of your last 5 passwords',
+      );
+    }
+
+    // Hash new password
+    const bcryptRounds =
+      this.configService.get<number>('auth.bcryptRounds') || 12;
+    const hashedPassword = await PasswordUtil.hashPassword(
+      newPassword,
+      bcryptRounds,
+    );
+
+    // Save current password to history before updating
+    if (user.password) {
+      await this.savePasswordToHistory(userId, user.password);
+    }
+
+    // Update password and set new expiry
+    user.password = hashedPassword;
+    user.passwordExpiresAt = this.calculatePasswordExpiryDate();
+    user.passwordChangeRequired = false;
+    await this.userRepository.save(user);
   }
 }
